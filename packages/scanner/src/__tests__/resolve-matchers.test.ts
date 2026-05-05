@@ -1,7 +1,7 @@
 import type { MatcherPlugin } from "@deepsec/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MatcherRegistry } from "../matcher-registry.js";
 import { resolveMatchers } from "../index.js";
+import { MatcherRegistry } from "../matcher-registry.js";
 
 function fakeMatcher(slug: string): MatcherPlugin {
   return {
