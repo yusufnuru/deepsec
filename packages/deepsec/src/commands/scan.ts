@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { findProject, getConfigPath, projectConfigPath } from "@deepsec/core";
+import { findProject, getConfig, getConfigPath, projectConfigPath } from "@deepsec/core";
 import { scan } from "@deepsec/scanner";
 import { BOLD, DIM, GREEN, RESET } from "../formatters.js";
 import { requireExistingDir } from "../require-dir.js";
@@ -51,7 +51,15 @@ export async function scanCommand(opts: { projectId?: string; root?: string; mat
 
   console.log(`${BOLD}Scanning${RESET} ${resolvedRoot} for project ${BOLD}${projectId}${RESET}`);
   if (matcherSlugs) {
-    console.log(`${DIM}Matchers: ${matcherSlugs.join(", ")}${RESET}`);
+    console.log(`${DIM}Matchers (--matchers): ${matcherSlugs.join(", ")}${RESET}`);
+  } else {
+    const cfgMatchers = getConfig()?.matchers;
+    if (cfgMatchers?.only?.length) {
+      console.log(`${DIM}Matchers (config only): ${cfgMatchers.only.join(", ")}${RESET}`);
+    }
+    if (cfgMatchers?.exclude?.length) {
+      console.log(`${DIM}Matchers (config exclude): ${cfgMatchers.exclude.join(", ")}${RESET}`);
+    }
   }
   console.log();
 

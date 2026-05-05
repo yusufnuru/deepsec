@@ -7,6 +7,7 @@ import {
   createRunMeta,
   dataDir,
   ensureProject,
+  getConfig,
   getRegistry,
   readFileRecord,
   writeFileRecord,
@@ -29,6 +30,42 @@ function buildMergedRegistry(): MatcherRegistry {
     registry.register(m);
   }
   return registry;
+}
+
+/**
+ * Resolve which matchers to run given an optional explicit list (e.g. from
+ * `--matchers` on the CLI) and the loaded config's `matchers.only/exclude`.
+ *
+ * Precedence:
+ *   - If `cliSlugs` is given, it is treated as exact: config is ignored.
+ *   - Otherwise, base = `cfg.only ?? all`, then `cfg.exclude` is subtracted.
+ *
+ * Unknown slugs in `only`/`exclude` are warned and ignored.
+ */
+export function resolveMatchers(
+  registry: MatcherRegistry,
+  cliSlugs: string[] | undefined,
+  cfg: { only?: string[]; exclude?: string[] } | undefined,
+): MatcherPlugin[] {
+  if (cliSlugs) {
+    return registry.getBySlugs(cliSlugs);
+  }
+
+  const known = new Set(registry.slugs());
+  const warnUnknown = (kind: "only" | "exclude", slugs: string[] | undefined) => {
+    if (!slugs) return;
+    for (const s of slugs) {
+      if (!known.has(s)) {
+        console.warn(`[deepsec] config matchers.${kind}: unknown matcher slug "${s}" — ignoring`);
+      }
+    }
+  };
+  warnUnknown("only", cfg?.only);
+  warnUnknown("exclude", cfg?.exclude);
+
+  const base = cfg?.only?.length ? registry.getBySlugs(cfg.only) : registry.getAll();
+  const exclude = new Set(cfg?.exclude ?? []);
+  return base.filter((m) => !exclude.has(m.slug));
 }
 
 /** Returns the noise tier for a given vulnSlug. Defaults to "normal". */
@@ -234,9 +271,7 @@ export async function scan(params: {
   onProgress?: (progress: ScanProgress) => void;
 }): Promise<{ runId: string; candidateCount: number }> {
   const registry = buildMergedRegistry();
-  const matchers = params.matcherSlugs
-    ? registry.getBySlugs(params.matcherSlugs)
-    : registry.getAll();
+  const matchers = resolveMatchers(registry, params.matcherSlugs, getConfig()?.matchers);
 
   if (matchers.length === 0) {
     throw new Error("No matchers selected");
